@@ -57,3 +57,34 @@ a.button { display: inline-block; background: #2f6b4f; color: #fff; padding: 10p
 .panel.removed { opacity: 0.65; background: #f3ead2; }
 .inline-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .inline-form input { flex: 1 1 220px; padding: 8px; border: 1px solid #cdbfa9; border-radius: 6px; font: inherit; }
+
+@media (max-width: 640px) {
+  .site-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  .site-header nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .site-header nav a {
+    margin-left: 0;
+    padding: 6px 14px;
+    font-size: 0.95rem;
+    border: 1px solid rgba(250, 246, 239, 0.4);
+    border-radius: 999px;
+  }
+  .container { padding: 16px 12px; }
+  h1 { font-size: 1.6rem; }
+  .filters input[type="search"],
+  .filters select,
+  .filters button { flex: 1 1 100%; }
+  .credit-card { padding: 16px; }
+  .credit-footer { flex-direction: column; align-items: flex-start; }
+  .match { flex-direction: column; }
+  .match img { width: 100%; }
+  .audit th, .audit td { font-size: 0.8rem; padding: 6px 4px; }
+}
