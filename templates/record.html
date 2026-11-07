@@ -21,4 +21,9 @@
   <dt>Reuse permission</dt><dd>{{ record['reuse_permission'] }}</dd>
   <dt>Credit line</dt><dd>{{ record['attribution_text'] }}</dd>
 </dl>
+
+<p>
+  <a class="button" href="{{ url_for('credit_page', record_id=record['record_id']) }}">View credit card</a>
+</p>
+
 {% endblock %}

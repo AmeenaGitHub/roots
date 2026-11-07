@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Credit · {{ record['title'] }}{% endblock %}
+{% block content %}
+<article class="credit-card">
+  <p class="credit-label">Roots · Credit card</p>
+  <h1>{{ record['title'] }}</h1>
+
+  {% if record['image_filename'] %}
+    <img class="hero" src="{{ url_for('static', filename='uploads/' + record['image_filename']) }}" alt="{{ record['title'] }}">
+  {% endif %}
+
+  <p class="credit-line">{{ record['attribution_text'] }}</p>
+
+  <dl class="details">
+    <dt>Creator</dt><dd>{{ record['creator'] }}</dd>
+    <dt>Art form</dt><dd>{{ record['art_form'] }}</dd>
+    <dt>Region</dt><dd>{{ record['region'] }}</dd>
+    <dt>Reuse permission</dt><dd><strong>{{ record['reuse_permission'] }}</strong></dd>
+    <dt>Cultural context</dt><dd>{{ record['cultural_context'] }}</dd>
+    <dt>Source</dt><dd>{{ record['source'] }}</dd>
+  </dl>
+
+  <div class="credit-footer">
+    <img class="qr" src="{{ url_for('qr_code', record_id=record['record_id']) }}" alt="QR code for this credit card">
+    <div>
+      <p><strong>Record ID: {{ record['record_id'] }}</strong></p>
+      <p class="muted">Scan to open this credit card.</p>
+      {% if record['is_sample'] %}
+        <p class="muted">Demonstration record. The creator is a sample, not a real person.</p>
+      {% endif %}
+      <p class="muted small">This card shows the credit and permissions stated by the record's creator. It does not decide legal ownership.</p>
+    </div>
+  </div>
+</article>
+
+<p class="actions no-print">
+  <a class="button" href="{{ url_for('download_record', record_id=record['record_id']) }}">Download provenance record (JSON)</a>
+  <button type="button" onclick="window.print()">Print / Save as PDF</button>
+  <a href="{{ url_for('record_detail', record_id=record['record_id']) }}">Back to record</a>
+</p>
+{% endblock %}

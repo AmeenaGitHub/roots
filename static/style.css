@@ -29,3 +29,16 @@ button { background: #2f6b4f; color: #fff; border: 0; padding: 10px 20px; border
 .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; align-items: center; }
 .filters input[type="search"] { flex: 2 1 260px; padding: 8px; border: 1px solid #cdbfa9; border-radius: 6px; font: inherit; }
 .filters select { flex: 1 1 180px; padding: 8px; border: 1px solid #cdbfa9; border-radius: 6px; font: inherit; }
+
+.credit-card { background: #fff; border: 3px double #5b3a29; border-radius: 12px; padding: 24px; max-width: 640px; margin: 0 auto; }
+.credit-label { text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.75rem; color: #7a6a5c; margin: 0; }
+.credit-line { font-size: 1.1rem; font-weight: 600; background: #e3efe8; padding: 10px 14px; border-radius: 8px; }
+.credit-footer { display: flex; gap: 16px; align-items: center; border-top: 1px dashed #cdbfa9; margin-top: 20px; padding-top: 16px; }
+.qr { width: 120px; height: 120px; }
+.small { font-size: 0.8rem; }
+.actions { max-width: 640px; margin: 16px auto; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+a.button { display: inline-block; background: #2f6b4f; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; }
+@media print {
+  .site-header, .site-footer, .no-print { display: none; }
+  body { background: #fff; }
+}

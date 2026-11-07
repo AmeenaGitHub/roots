@@ -1,10 +1,14 @@
+import io
+import json
+import qrcode
+
 import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 
 from flask import (Flask, abort, flash, g, redirect, render_template,
-                   request, url_for)
+                   request, url_for, Response, send_file)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(BASE_DIR, "roots.db")
@@ -180,6 +184,61 @@ def record_detail(record_id):
     if record is None:
         abort(404)
     return render_template("record.html", record=record)
+
+def get_record_or_404(record_id):
+    record = get_db().execute(
+        "SELECT * FROM records WHERE record_id = ?", (record_id,)).fetchone()
+    if record is None:
+        abort(404)
+    return record
+
+
+@app.route("/credit/<record_id>")
+def credit_page(record_id):
+    record = get_record_or_404(record_id)
+    return render_template("credit.html", record=record)
+
+
+@app.route("/qr/<record_id>.png")
+def qr_code(record_id):
+    get_record_or_404(record_id)
+    link = url_for("credit_page", record_id=record_id, _external=True)
+    img = qrcode.make(link)
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
+
+
+@app.route("/record/<record_id>/download")
+def download_record(record_id):
+    record = get_record_or_404(record_id)
+    data = {
+        "roots_provenance_record": {
+            "record_id": record["record_id"],
+            "title": record["title"],
+            "creator": record["creator"],
+            "art_form": record["art_form"],
+            "region": record["region"],
+            "year": record["year"],
+            "cultural_context": record["cultural_context"],
+            "source": record["source"],
+            "reuse_permission": record["reuse_permission"],
+            "credit_line": record["attribution_text"],
+            "demonstration_record": bool(record["is_sample"]),
+            "created_at": record["created_at"],
+            "credit_page": url_for("credit_page", record_id=record_id,
+                                   _external=True),
+        },
+        "disclaimer": ("This file records the credit and permissions stated "
+                       "by the person who created the record. It is not a "
+                       "legal proof of ownership."),
+    }
+    body = json.dumps(data, indent=2, ensure_ascii=False)
+    return Response(
+        body, mimetype="application/json",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{record_id}-provenance.json"'})
 
 
 with app.app_context():
