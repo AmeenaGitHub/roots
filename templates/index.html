@@ -4,6 +4,29 @@
 <h1>Roots</h1>
 <p class="tagline">Know where culture comes from.</p>
 
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ q }}"
+         placeholder="Search by title, creator or record ID (e.g. RT-0003)">
+  <select name="art_form">
+    <option value="">All art forms</option>
+    {% for a in art_forms %}
+      <option value="{{ a }}" {% if a == art_form %}selected{% endif %}>{{ a }}</option>
+    {% endfor %}
+  </select>
+  <select name="reuse">
+    <option value="">Any reuse permission</option>
+    {% for o in reuse_options %}
+      <option value="{{ o }}" {% if o == reuse %}selected{% endif %}>{{ o }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Search</button>
+  {% if q or art_form or reuse %}
+    <a href="{{ url_for('index') }}">Clear</a>
+  {% endif %}
+</form>
+
+<p class="muted">{{ records|length }} record{{ '' if records|length == 1 else 's' }} found</p>
+
 <div class="grid">
   {% for r in records %}
   <a class="card" href="{{ url_for('record_detail', record_id=r['record_id']) }}">
@@ -15,6 +38,8 @@
     <p>{{ r['creator'] }}</p>
     <p class="muted">{{ r['region'] }} · {{ r['record_id'] }}</p>
   </a>
+  {% else %}
+    <p>No records match your search. Try a different word or click Clear.</p>
   {% endfor %}
 </div>
 {% endblock %}

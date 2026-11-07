@@ -122,9 +122,31 @@ def save_image(file):
 
 @app.route("/")
 def index():
-    records = get_db().execute(
-        "SELECT * FROM records ORDER BY id DESC").fetchall()
-    return render_template("index.html", records=records)
+    db = get_db()
+    q = request.args.get("q", "").strip()
+    art_form = request.args.get("art_form", "").strip()
+    reuse = request.args.get("reuse", "").strip()
+
+    sql = "SELECT * FROM records WHERE 1=1"
+    params = []
+    if q:
+        sql += " AND (title LIKE ? OR creator LIKE ? OR record_id LIKE ?)"
+        like = f"%{q}%"
+        params += [like, like, like]
+    if art_form:
+        sql += " AND art_form = ?"
+        params.append(art_form)
+    if reuse:
+        sql += " AND reuse_permission = ?"
+        params.append(reuse)
+    sql += " ORDER BY id DESC"
+
+    records = db.execute(sql, params).fetchall()
+    art_forms = [row["art_form"] for row in db.execute(
+        "SELECT DISTINCT art_form FROM records ORDER BY art_form")]
+    return render_template(
+        "index.html", records=records, art_forms=art_forms,
+        reuse_options=REUSE_OPTIONS, q=q, art_form=art_form, reuse=reuse)
 
 
 @app.route("/new", methods=["GET", "POST"])
