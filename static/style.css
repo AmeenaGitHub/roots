@@ -42,3 +42,9 @@ a.button { display: inline-block; background: #2f6b4f; color: #fff; padding: 10p
   .site-header, .site-footer, .no-print { display: none; }
   body { background: #fff; }
 }
+
+.panel { background: #fff; border: 1px solid #e6dccd; border-radius: 10px; padding: 16px 20px; margin-top: 24px; }
+.panel h2 { margin-top: 0; }
+.flagged { color: #a8402f; font-weight: 600; }
+.audit { width: 100%; border-collapse: collapse; }
+.audit th, .audit td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #efe6d8; font-size: 0.9rem; }

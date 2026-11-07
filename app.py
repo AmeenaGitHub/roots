@@ -21,6 +21,13 @@ REUSE_OPTIONS = [
     "Ask the creator before reuse",
     "Do not reuse",
 ]
+
+FLAG_REASONS = [
+    "Missing attribution",
+    "Possible unauthorised reuse",
+    "Incorrect or outdated information",
+]
+
 REQUIRED = ["title", "creator", "art_form", "region", "cultural_context",
             "source", "reuse_permission", "attribution_text"]
 FIELDS = REQUIRED + ["year"]
@@ -176,21 +183,25 @@ def new_record():
                 return redirect(url_for("record_detail", record_id=record_id))
     return render_template("new.html", form=form, reuse_options=REUSE_OPTIONS)
 
-
-@app.route("/record/<record_id>")
-def record_detail(record_id):
-    record = get_db().execute(
-        "SELECT * FROM records WHERE record_id = ?", (record_id,)).fetchone()
-    if record is None:
-        abort(404)
-    return render_template("record.html", record=record)
-
 def get_record_or_404(record_id):
     record = get_db().execute(
         "SELECT * FROM records WHERE record_id = ?", (record_id,)).fetchone()
     if record is None:
         abort(404)
     return record
+
+@app.route("/record/<record_id>")
+def record_detail(record_id):
+    db = get_db()
+    record = get_record_or_404(record_id)
+    audit = db.execute(
+        "SELECT * FROM audit_log WHERE record_id = ? ORDER BY id DESC",
+        (record_id,)).fetchall()
+    flag_count = db.execute(
+        "SELECT COUNT(*) FROM flags WHERE record_id = ?",
+        (record_id,)).fetchone()[0]
+    return render_template("record.html", record=record, audit=audit,
+                           flag_count=flag_count, flag_reasons=FLAG_REASONS)
 
 
 @app.route("/credit/<record_id>")
@@ -240,6 +251,27 @@ def download_record(record_id):
         headers={"Content-Disposition":
                  f'attachment; filename="{record_id}-provenance.json"'})
 
+@app.route("/record/<record_id>/flag", methods=["POST"])
+def flag_record(record_id):
+    get_record_or_404(record_id)
+    reason = request.form.get("reason", "").strip()
+    note = request.form.get("note", "").strip()[:500]
+    if reason not in FLAG_REASONS:
+        flash("Please choose a reason for the flag.", "error")
+    elif not note:
+        flash("Please say where you saw the work or what is wrong.", "error")
+    else:
+        db = get_db()
+        db.execute(
+            "INSERT INTO flags (record_id, reason, note, created_at) "
+            "VALUES (?, ?, ?, ?)", (record_id, reason, note, now()))
+        db.execute(
+            "INSERT INTO audit_log (record_id, action, details, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (record_id, "flagged", f"Flag submitted: {reason}", now()))
+        db.commit()
+        flash("Thank you. Your flag has been recorded for review.", "success")
+    return redirect(url_for("record_detail", record_id=record_id) + "#flag")
 
 with app.app_context():
     init_db()
