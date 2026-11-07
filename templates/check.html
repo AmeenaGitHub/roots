@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Check an image{% endblock %}
+{% block content %}
+<h1>Check an image</h1>
+<p class="muted">Upload a picture to see whether it looks like an artwork already recorded in Roots. Your image is checked and then discarded. It is not saved.</p>
+
+<form method="post" enctype="multipart/form-data" class="form">
+  <label>Image to check (PNG, JPG or WEBP, max 5 MB)
+    <input type="file" name="image" accept=".png,.jpg,.jpeg,.webp" required>
+  </label>
+  <button type="submit">Check</button>
+</form>
+
+{% if matches is not none %}
+  <section class="panel">
+    <h2>Result</h2>
+    {% if matches %}
+      <p>This image looks similar to {{ matches|length }} record{{ '' if matches|length == 1 else 's' }} in the catalogue.</p>
+      {% for m in matches %}
+        <div class="match">
+          {% if m.record['image_filename'] %}
+            <img src="{{ url_for('static', filename='uploads/' + m.record['image_filename']) }}" alt="{{ m.record['title'] }}">
+          {% endif %}
+          <div>
+            <h3>{{ m.record['title'] }}</h3>
+            <p><strong>{{ m.label }}</strong> · {{ m.inliers }} matching image features</p>
+            <p>Credited to: {{ m.record['creator'] }}</p>
+            <p>Reuse permission: {{ m.record['reuse_permission'] }}</p>
+            <p>
+              <a href="{{ url_for('credit_page', record_id=m.record['record_id']) }}">View credit card</a> ·
+              <a href="{{ url_for('record_detail', record_id=m.record['record_id']) }}#flag">Flag a problem</a>
+            </p>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No similar image was found in the Roots catalogue.</p>
+      {% if closest %}
+        <p class="muted small">Developer note: the closest record was {{ closest.record['record_id'] }} with {{ closest.inliers }} matching features. Matches count at {{ min_inliers }} or more.</p>
+      {% endif %}
+    {% endif %}
+    <p class="muted small">This is a visual similarity hint only. It does not prove who made or owns a work, and a missing match does not mean a work is original. Roots can only compare with the records it holds.</p>
+  </section>
+{% endif %}
+{% endblock %}

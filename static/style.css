@@ -48,3 +48,8 @@ a.button { display: inline-block; background: #2f6b4f; color: #fff; padding: 10p
 .flagged { color: #a8402f; font-weight: 600; }
 .audit { width: 100%; border-collapse: collapse; }
 .audit th, .audit td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #efe6d8; font-size: 0.9rem; }
+
+.match { display: flex; gap: 16px; align-items: flex-start; border-top: 1px solid #efe6d8; padding: 12px 0; }
+.match img { width: 140px; border-radius: 8px; }
+.match h3 { margin: 0 0 4px; }
+.match p { margin: 2px 0; }

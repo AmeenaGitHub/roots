@@ -1,3 +1,6 @@
+import cv2
+import numpy as np
+
 import io
 import json
 import qrcode
@@ -28,6 +31,8 @@ FLAG_REASONS = [
     "Incorrect or outdated information",
 ]
 
+MATCH_MIN_INLIERS = 25  # higher = stricter matching
+
 REQUIRED = ["title", "creator", "art_form", "region", "cultural_context",
             "source", "reuse_permission", "attribution_text"]
 FIELDS = REQUIRED + ["year"]
@@ -50,6 +55,7 @@ CREATE TABLE IF NOT EXISTS records (
     reuse_permission TEXT NOT NULL,
     attribution_text TEXT NOT NULL,
     image_filename TEXT,
+    image_hash TEXT,
     is_sample INTEGER NOT NULL DEFAULT 0,
     consent_confirmed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
@@ -88,6 +94,9 @@ def close_db(error):
 def init_db():
     db = get_db()
     db.executescript(SCHEMA)
+    columns = [row["name"] for row in db.execute("PRAGMA table_info(records)")]
+    if "image_hash" not in columns:
+        db.execute("ALTER TABLE records ADD COLUMN image_hash TEXT")
     db.commit()
 
 
@@ -129,6 +138,78 @@ def save_image(file):
     name = uuid.uuid4().hex + "." + ext
     file.save(os.path.join(UPLOAD_FOLDER, name))
     return name
+
+
+_feature_cache = {}
+
+
+def image_features(data):
+    """Find distinctive points in an image. Returns None if unreadable."""
+    array = np.frombuffer(data, dtype=np.uint8)
+    gray = cv2.imdecode(array, cv2.IMREAD_GRAYSCALE)
+    if gray is None:
+        return None
+    height, width = gray.shape
+    scale = 800 / max(height, width)
+    if scale < 1:
+        gray = cv2.resize(gray, (int(width * scale), int(height * scale)),
+                          interpolation=cv2.INTER_AREA)
+    keypoints, descriptors = cv2.SIFT_create(nfeatures=800).detectAndCompute(
+        gray, None)
+    if descriptors is None or len(keypoints) < 8:
+        return None
+    points = np.float32([k.pt for k in keypoints])
+    return points, descriptors
+
+
+def count_matches(first, second):
+    """Count details that appear in both images in a consistent layout."""
+    points1, desc1 = first
+    points2, desc2 = second
+    pairs = cv2.BFMatcher(cv2.NORM_L2).knnMatch(desc1, desc2, k=2)
+    good = [p[0] for p in pairs
+            if len(p) == 2 and p[0].distance < 0.75 * p[1].distance]
+    if len(good) < 8:
+        return 0
+    src = points1[[m.queryIdx for m in good]].reshape(-1, 1, 2)
+    dst = points2[[m.trainIdx for m in good]].reshape(-1, 1, 2)
+    matrix, mask = cv2.estimateAffinePartial2D(
+        src, dst, method=cv2.RANSAC, ransacReprojThreshold=5.0)
+    return int(mask.sum()) if mask is not None else 0
+
+
+def stored_features(filename):
+    if filename not in _feature_cache:
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        features = None
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                features = image_features(f.read())
+        _feature_cache[filename] = features
+    return _feature_cache[filename]
+
+
+def find_similar(db, data, min_inliers=MATCH_MIN_INLIERS):
+    """Return catalogue records whose image looks like this image."""
+    query = image_features(data)
+    if query is None:
+        return []
+    matches = []
+    rows = db.execute(
+        "SELECT * FROM records WHERE image_filename IS NOT NULL").fetchall()
+    for row in rows:
+        features = stored_features(row["image_filename"])
+        if features is None:
+            continue
+        inliers = count_matches(query, features)
+        if inliers >= min_inliers:
+            matches.append({
+                "record": row,
+                "inliers": inliers,
+                "label": "Strong match" if inliers >= 100 else "Possible match",
+            })
+    matches.sort(key=lambda m: m["inliers"], reverse=True)
+    return matches
 
 
 @app.route("/")
@@ -178,8 +259,38 @@ def new_record():
             except ValueError as err:
                 flash(str(err), "error")
             else:
-                record_id = create_record(get_db(), form, image)
+                db = get_db()
+                similar = []
+                if image:
+                    with open(os.path.join(UPLOAD_FOLDER, image), "rb") as f:
+                        similar = find_similar(db, f.read())
+                record_id = create_record(db, form, image)
                 flash(f"Record {record_id} created.", "success")
+                if similar:
+                    for m in similar[:3]:
+                        orig = m["record"]
+                        db.execute(
+                            "INSERT INTO audit_log (record_id, action, details, created_at) "
+                            "VALUES (?, ?, ?, ?)",
+                            (record_id, "similarity_notice",
+                             f"At creation, the image was a {m['label'].lower()} "
+                             f"for {orig['record_id']} (credited to "
+                             f"{orig['creator']}).", now()))
+                        db.execute(
+                            "INSERT INTO audit_log (record_id, action, details, created_at) "
+                            "VALUES (?, ?, ?, ?)",
+                            (orig["record_id"], "similarity_notice",
+                             f"A record with a similar image was added: "
+                             f"{record_id} ({m['label'].lower()}).", now()))
+                    db.commit()
+                    top = similar[0]
+                    flash(
+                        f"Heads up: this image looks similar to "
+                        f"{top['record']['record_id']} "
+                        f"({top['record']['title']}, credited to "
+                        f"{top['record']['creator']}). This has been noted on "
+                        f"both records. It is only a hint, so please check "
+                        f"that your record is accurate.", "info")
                 return redirect(url_for("record_detail", record_id=record_id))
     return render_template("new.html", form=form, reuse_options=REUSE_OPTIONS)
 
@@ -272,6 +383,32 @@ def flag_record(record_id):
         db.commit()
         flash("Thank you. Your flag has been recorded for review.", "success")
     return redirect(url_for("record_detail", record_id=record_id) + "#flag")
+
+@app.route("/check", methods=["GET", "POST"])
+def check_image():
+    matches = None
+    closest = None
+    if request.method == "POST":
+        file = request.files.get("image")
+        if not file or not file.filename:
+            flash("Please choose an image to check.", "error")
+        else:
+            ext = os.path.splitext(file.filename)[1].lower().lstrip(".")
+            if ext not in ALLOWED_EXTENSIONS:
+                flash("Image must be a PNG, JPG or WEBP file.", "error")
+            else:
+                data = file.read()
+                if image_features(data) is None:
+                    flash("That file could not be read as an image with "
+                          "enough detail to compare.", "error")
+                else:
+                    db = get_db()
+                    matches = find_similar(db, data)
+                    if not matches and app.debug:
+                        nearest = find_similar(db, data, min_inliers=0)
+                        closest = nearest[0] if nearest else None
+    return render_template("check.html", matches=matches, closest=closest,
+                           min_inliers=MATCH_MIN_INLIERS)
 
 with app.app_context():
     init_db()
