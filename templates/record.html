@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ record['title'] }}{% endblock %}
+{% block content %}
+{% if record['is_sample'] %}
+  <div class="flash info">Demonstration record: the creator is a sample, not a real person.</div>
+{% endif %}
+<h1>{{ record['title'] }}</h1>
+<p class="muted">Record ID: {{ record['record_id'] }}</p>
+
+{% if record['image_filename'] %}
+  <img class="hero" src="{{ url_for('static', filename='uploads/' + record['image_filename']) }}" alt="{{ record['title'] }}">
+{% endif %}
+
+<dl class="details">
+  <dt>Creator</dt><dd>{{ record['creator'] }}</dd>
+  <dt>Art form</dt><dd>{{ record['art_form'] }}</dd>
+  <dt>Region</dt><dd>{{ record['region'] }}</dd>
+  {% if record['year'] %}<dt>Year</dt><dd>{{ record['year'] }}</dd>{% endif %}
+  <dt>Cultural context</dt><dd>{{ record['cultural_context'] }}</dd>
+  <dt>Source</dt><dd>{{ record['source'] }}</dd>
+  <dt>Reuse permission</dt><dd>{{ record['reuse_permission'] }}</dd>
+  <dt>Credit line</dt><dd>{{ record['attribution_text'] }}</dd>
+</dl>
+{% endblock %}

@@ -1,12 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Roots</title>
-</head>
-<body>
-  <h1>Roots</h1>
-  <p>Know where culture comes from.</p>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}Catalogue{% endblock %}
+{% block content %}
+<h1>Roots</h1>
+<p class="tagline">Know where culture comes from.</p>
+
+<div class="grid">
+  {% for r in records %}
+  <a class="card" href="{{ url_for('record_detail', record_id=r['record_id']) }}">
+    {% if r['image_filename'] %}
+      <img src="{{ url_for('static', filename='uploads/' + r['image_filename']) }}" alt="{{ r['title'] }}">
+    {% endif %}
+    <span class="badge">{{ r['art_form'] }}</span>
+    <h3>{{ r['title'] }}</h3>
+    <p>{{ r['creator'] }}</p>
+    <p class="muted">{{ r['region'] }} · {{ r['record_id'] }}</p>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

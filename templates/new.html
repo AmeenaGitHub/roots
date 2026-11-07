@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Add a record{% endblock %}
+{% block content %}
+<h1>Add a record</h1>
+<form method="post" enctype="multipart/form-data" class="form">
+  <label>Title *
+    <input name="title" value="{{ form.get('title', '') }}" required>
+  </label>
+  <label>Creator or community *
+    <input name="creator" value="{{ form.get('creator', '') }}" required>
+  </label>
+  <label>Art form *
+    <input name="art_form" value="{{ form.get('art_form', '') }}" required>
+  </label>
+  <label>Region *
+    <input name="region" value="{{ form.get('region', '') }}" required>
+  </label>
+  <label>Year (optional)
+    <input name="year" value="{{ form.get('year', '') }}">
+  </label>
+  <label>Cultural context *
+    <textarea name="cultural_context" rows="4" required>{{ form.get('cultural_context', '') }}</textarea>
+  </label>
+  <label>Source *
+    <input name="source" value="{{ form.get('source', '') }}" required>
+  </label>
+  <label>Reuse permission *
+    <select name="reuse_permission" required>
+      {% for option in reuse_options %}
+        <option value="{{ option }}" {% if form.get('reuse_permission') == option %}selected{% endif %}>{{ option }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Credit line to use when sharing *
+    <input name="attribution_text" value="{{ form.get('attribution_text', '') }}" required>
+  </label>
+  <label>Image (optional, PNG, JPG or WEBP, max 5 MB)
+    <input type="file" name="image" accept=".png,.jpg,.jpeg,.webp">
+  </label>
+  <label class="check">
+    <input type="checkbox" name="consent">
+    I am the creator, or I have the creator's or community's permission to record this work.
+  </label>
+  <button type="submit">Save record</button>
+</form>
+{% endblock %}
