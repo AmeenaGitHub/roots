@@ -53,3 +53,7 @@ a.button { display: inline-block; background: #2f6b4f; color: #fff; padding: 10p
 .match img { width: 140px; border-radius: 8px; }
 .match h3 { margin: 0 0 4px; }
 .match p { margin: 2px 0; }
+
+.panel.removed { opacity: 0.65; background: #f3ead2; }
+.inline-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.inline-form input { flex: 1 1 220px; padding: 8px; border: 1px solid #cdbfa9; border-radius: 6px; font: inherit; }

@@ -1,3 +1,6 @@
+import hmac
+from functools import wraps
+
 import cv2
 import numpy as np
 
@@ -11,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 
 from flask import (Flask, abort, flash, g, redirect, render_template,
-                   request, url_for, Response, send_file)
+                   request, url_for, Response, send_file, session)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(BASE_DIR, "roots.db")
@@ -32,6 +35,8 @@ FLAG_REASONS = [
 ]
 
 MATCH_MIN_INLIERS = 25  # higher = stricter matching
+
+REVIEWER_PASSWORD = os.environ.get("REVIEWER_PASSWORD")
 
 REQUIRED = ["title", "creator", "art_form", "region", "cultural_context",
             "source", "reuse_permission", "attribution_text"]
@@ -97,6 +102,10 @@ def init_db():
     columns = [row["name"] for row in db.execute("PRAGMA table_info(records)")]
     if "image_hash" not in columns:
         db.execute("ALTER TABLE records ADD COLUMN image_hash TEXT")
+    if "status" not in columns:
+        db.execute("ALTER TABLE records ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+    if "removed_reason" not in columns:
+        db.execute("ALTER TABLE records ADD COLUMN removed_reason TEXT")
     db.commit()
 
 
@@ -196,7 +205,8 @@ def find_similar(db, data, min_inliers=MATCH_MIN_INLIERS):
         return []
     matches = []
     rows = db.execute(
-        "SELECT * FROM records WHERE image_filename IS NOT NULL").fetchall()
+        "SELECT * FROM records WHERE image_filename IS NOT NULL "
+        "AND status = 'active'").fetchall()
     for row in rows:
         features = stored_features(row["image_filename"])
         if features is None:
@@ -219,7 +229,7 @@ def index():
     art_form = request.args.get("art_form", "").strip()
     reuse = request.args.get("reuse", "").strip()
 
-    sql = "SELECT * FROM records WHERE 1=1"
+    sql = "SELECT * FROM records WHERE status = 'active'"
     params = []
     if q:
         sql += " AND (title LIKE ? OR creator LIKE ? OR record_id LIKE ?)"
@@ -235,7 +245,8 @@ def index():
 
     records = db.execute(sql, params).fetchall()
     art_forms = [row["art_form"] for row in db.execute(
-        "SELECT DISTINCT art_form FROM records ORDER BY art_form")]
+        "SELECT DISTINCT art_form FROM records WHERE status = 'active' "
+        "ORDER BY art_form")]
     return render_template(
         "index.html", records=records, art_forms=art_forms,
         reuse_options=REUSE_OPTIONS, q=q, art_form=art_form, reuse=reuse)
@@ -299,6 +310,8 @@ def get_record_or_404(record_id):
         "SELECT * FROM records WHERE record_id = ?", (record_id,)).fetchone()
     if record is None:
         abort(404)
+    if record["status"] == "removed":
+        abort(410)
     return record
 
 @app.route("/record/<record_id>")
@@ -409,6 +422,97 @@ def check_image():
                         closest = nearest[0] if nearest else None
     return render_template("check.html", matches=matches, closest=closest,
                            min_inliers=MATCH_MIN_INLIERS)
+
+
+@app.errorhandler(410)
+def record_removed(error):
+    return render_template("removed.html"), 410
+
+
+@app.context_processor
+def inject_reviewer():
+    return {"is_reviewer": bool(session.get("reviewer"))}
+
+
+def reviewer_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("reviewer"):
+            return redirect(url_for("reviewer_login"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.route("/reviewer/login", methods=["GET", "POST"])
+def reviewer_login():
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if REVIEWER_PASSWORD and hmac.compare_digest(
+                password.encode(), REVIEWER_PASSWORD.encode()):
+            session["reviewer"] = True
+            return redirect(url_for("reviewer_dashboard"))
+        flash("Incorrect password, or reviewer access is not set up.", "error")
+    return render_template("reviewer_login.html")
+
+
+@app.route("/reviewer/logout")
+def reviewer_logout():
+    session.pop("reviewer", None)
+    return redirect(url_for("index"))
+
+
+@app.route("/reviewer")
+@reviewer_required
+def reviewer_dashboard():
+    db = get_db()
+    records = db.execute(
+        "SELECT r.*, (SELECT COUNT(*) FROM flags f "
+        "WHERE f.record_id = r.record_id) AS flag_count "
+        "FROM records r ORDER BY flag_count DESC, r.id DESC").fetchall()
+    flags_by_record = {}
+    for f in db.execute("SELECT * FROM flags ORDER BY id DESC").fetchall():
+        flags_by_record.setdefault(f["record_id"], []).append(f)
+    return render_template("reviewer.html", records=records,
+                           flags_by_record=flags_by_record)
+
+
+@app.route("/reviewer/record/<record_id>/remove", methods=["POST"])
+@reviewer_required
+def reviewer_remove(record_id):
+    reason = request.form.get("reason", "").strip()[:300]
+    if not reason:
+        flash("Please give a reason for removing the record.", "error")
+    else:
+        db = get_db()
+        cur = db.execute(
+            "UPDATE records SET status = 'removed', removed_reason = ? "
+            "WHERE record_id = ?", (reason, record_id))
+        if cur.rowcount:
+            db.execute(
+                "INSERT INTO audit_log (record_id, action, details, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (record_id, "removed", f"Removed by reviewer: {reason}", now()))
+            db.commit()
+            flash(f"{record_id} removed.", "success")
+    return redirect(url_for("reviewer_dashboard"))
+
+
+@app.route("/reviewer/record/<record_id>/restore", methods=["POST"])
+@reviewer_required
+def reviewer_restore(record_id):
+    db = get_db()
+    cur = db.execute(
+        "UPDATE records SET status = 'active', removed_reason = NULL "
+        "WHERE record_id = ?", (record_id,))
+    if cur.rowcount:
+        db.execute(
+            "INSERT INTO audit_log (record_id, action, details, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (record_id, "restored", "Restored by reviewer", now()))
+        db.commit()
+        flash(f"{record_id} restored.", "success")
+    return redirect(url_for("reviewer_dashboard"))
+
 
 with app.app_context():
     init_db()

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Reviewer{% endblock %}
+{% block content %}
+<h1>Reviewer dashboard</h1>
+<p class="muted">Records with the most flags come first. Removing hides a record from the public and keeps its history.</p>
+
+{% for r in records %}
+<section class="panel {{ 'removed' if r['status'] == 'removed' }}">
+  <h3>{{ r['title'] }}
+    <span class="muted">· {{ r['record_id'] }} · {{ r['creator'] }}</span></h3>
+  <p>
+    Status: <strong>{{ r['status'] }}</strong>
+    {% if r['flag_count'] %}· <span class="flagged">{{ r['flag_count'] }} flag{{ '' if r['flag_count'] == 1 else 's' }}</span>{% endif %}
+    {% if r['status'] == 'removed' %}· Reason: {{ r['removed_reason'] }}{% endif %}
+  </p>
+
+  {% for f in flags_by_record.get(r['record_id'], []) %}
+    <p class="small"><strong>{{ f['reason'] }}:</strong> {{ f['note'] }} <span class="muted">({{ f['created_at'].replace('T', ' ') }} UTC)</span></p>
+  {% endfor %}
+
+  {% if r['status'] == 'active' %}
+    <form method="post" action="{{ url_for('reviewer_remove', record_id=r['record_id']) }}" class="inline-form">
+      <input name="reason" placeholder="Reason for removal" required>
+      <button type="submit">Remove</button>
+      <a href="{{ url_for('record_detail', record_id=r['record_id']) }}">View</a>
+    </form>
+  {% else %}
+    <form method="post" action="{{ url_for('reviewer_restore', record_id=r['record_id']) }}">
+      <button type="submit">Restore</button>
+    </form>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Record removed{% endblock %}
+{% block content %}
+<h1>This record has been removed</h1>
+<p>A reviewer has taken this record down. If you think this is a mistake, please contact the team that runs this catalogue.</p>
+<p><a href="{{ url_for('index') }}">Back to the catalogue</a></p>
+{% endblock %}
