@@ -5,7 +5,6 @@
 A provenance and attribution tool for cultural works, built by Team RA.1 for ART//CODE 2026 (challenge PS-03, Attribution & Ownership).
 
 - Live demo: https://rootsra1.pythonanywhere.com
-- Demo video: [PASTE VIDEO LINK]
 - Source code: https://github.com/AmeenaGitHub/roots
 
 ## 1. Project Overview
